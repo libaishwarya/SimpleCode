@@ -48,7 +48,8 @@ def login():
         }))
     r.headers["Authorization"] = jwt.encode({
             "name": user[1],
-            "emailId": user[2]
+            "emailId": user[2],
+            "userID": user[0]
         }, "mysecretkey", algorithm="HS256")
     return r, 200
 
@@ -58,15 +59,42 @@ def getData():
     if authHeader:
         try:
             decodedData = jwt.decode(authHeader, key="mysecretkey", algorithms="HS256")
-            return data[decodedData["name"]], 200
+            userID = decodedData["userID"]
+            cursor = connection.cursor()
+            cursor.execute('SELECT * FROM todoList WHERE userID  = %s', (userID,))
+            todos = cursor.fetchall()
+            result = []
+            for i in todos:
+                t = {
+                    "id": i[0],
+                    "todo": i[2]
+                }
+                result.append(t)
+            return result, 200
+        except Exception as e:
+            print(e)
+            return "", 401
+    else:
+        return "", 401
+    
+@app.route('/addTodo',methods=['POST'])
+def addTodo():
+    authHeader = request.headers.get('Authorization')
+    if authHeader:
+        try:
+            decodedData = jwt.decode(authHeader, key="mysecretkey", algorithms="HS256")
+            # TODO(aishu): add data here
+            userID = decodedData["userID"]
+            todo = request.form['todo']
+            cursor = connection.cursor()
+            cursor.execute("INSERT INTO todoList(userID, todo) VALUES (%s,%s)", (userID, todo))
+            connection.commit()
+            cursor.close()
+            return "", 200
         except:
             return "", 401
     else:
-        return "", 200
-
-@app.route('/logout')
-def logout():
-    return ('logged out')
+        return "", 401
      
 if __name__ == '__main__':
-    app.run(debug=True)
+    app.run()
